@@ -20,6 +20,9 @@ from typing import Optional
 
 import pydicom
 import numpy as np
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -599,6 +602,184 @@ class ImpactionDatabase:
             json.dump(rows, f, indent=2, default=str)
         log.info(f"Exported {len(rows)} records → {path}")
 
+    def export_excel(self, path: str):
+        """Export all impacted teeth records to an Excel workbook."""
+        cur = self.conn.cursor()
+        
+        # Fetch all records
+        cur.execute("""
+            SELECT p.patient_id, p.patient_name, p.dob,
+                   s.study_date, s.modality, s.dicom_file,
+                   t.tooth_fdi, t.tooth_name, t.tooth_type,
+                   t.pg_class, t.pg_depth, t.winters_angle,
+                   t.impaction_severity, t.confidence, t.notes
+            FROM impacted_teeth t
+            JOIN studies s ON s.id = t.study_pk
+            JOIN patients p ON p.id = s.patient_pk
+            ORDER BY p.patient_id, t.tooth_fdi
+        """)
+        rows = cur.fetchall()
+        
+        # Create workbook
+        wb = Workbook()
+        
+        # ─── Sheet 1: Detailed Records ───────────────────────────────────────
+        ws_detail = wb.active
+        ws_detail.title = "Detailed Records"
+        
+        headers = [
+            "Patient ID", "Patient Name", "DOB", "Study Date", "Modality", 
+            "DICOM File", "Tooth FDI", "Tooth Name", "Tooth Type",
+            "P&G Class", "P&G Depth", "Winter's Angle", 
+            "Severity", "Confidence", "Notes"
+        ]
+        
+        # Write headers
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        header_fill = PatternFill(start_color="185FA5", end_color="185FA5", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws_detail.cell(row=1, column=col_idx, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+        
+        # Write data rows
+        thin_border = Border(
+            left=Side(style='thin'), right=Side(style='thin'),
+            top=Side(style='thin'), bottom=Side(style='thin')
+        )
+        center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        
+        for row_idx, row in enumerate(rows, 2):
+            ws_detail.cell(row=row_idx, column=1, value=row[0])  # patient_id
+            ws_detail.cell(row=row_idx, column=2, value=row[1])  # patient_name
+            ws_detail.cell(row=row_idx, column=3, value=row[2])  # dob
+            ws_detail.cell(row=row_idx, column=4, value=row[3])  # study_date
+            ws_detail.cell(row=row_idx, column=5, value=row[4])  # modality
+            ws_detail.cell(row=row_idx, column=6, value=row[5])  # dicom_file
+            ws_detail.cell(row=row_idx, column=7, value=row[6])  # tooth_fdi
+            ws_detail.cell(row=row_idx, column=8, value=row[7])  # tooth_name
+            ws_detail.cell(row=row_idx, column=9, value=row[8])  # tooth_type
+            ws_detail.cell(row=row_idx, column=10, value=row[9])  # pg_class
+            ws_detail.cell(row=row_idx, column=11, value=row[10])  # pg_depth
+            ws_detail.cell(row=row_idx, column=12, value=row[11])  # winters_angle
+            ws_detail.cell(row=row_idx, column=13, value=row[12])  # severity
+            ws_detail.cell(row=row_idx, column=14, value=round(float(row[13]), 4) if row[13] else None)  # confidence
+            ws_detail.cell(row=row_idx, column=15, value=row[14])  # notes
+            
+            for col_idx in range(1, 16):
+                cell = ws_detail.cell(row=row_idx, column=col_idx)
+                cell.border = thin_border
+                if col_idx in [7, 10, 11, 13, 14]:  # Numeric/class columns
+                    cell.alignment = center_align
+        
+        # Auto-adjust column widths
+        ws_detail.column_dimensions['A'].width = 12
+        ws_detail.column_dimensions['B'].width = 18
+        ws_detail.column_dimensions['C'].width = 12
+        ws_detail.column_dimensions['D'].width = 12
+        ws_detail.column_dimensions['E'].width = 10
+        ws_detail.column_dimensions['F'].width = 30
+        ws_detail.column_dimensions['G'].width = 10
+        ws_detail.column_dimensions['H'].width = 25
+        ws_detail.column_dimensions['I'].width = 12
+        ws_detail.column_dimensions['J'].width = 10
+        ws_detail.column_dimensions['K'].width = 10
+        ws_detail.column_dimensions['L'].width = 15
+        ws_detail.column_dimensions['M'].width = 12
+        ws_detail.column_dimensions['N'].width = 12
+        ws_detail.column_dimensions['O'].width = 35
+        
+        # Freeze header row
+        ws_detail.freeze_panes = "A2"
+        
+        # ─── Sheet 2: Summary Statistics ─────────────────────────────────────
+        ws_summary = wb.create_sheet("Summary")
+        
+        stats = self.summary()
+        
+        row = 1
+        title_font = Font(bold=True, size=12)
+        category_font = Font(bold=True, size=11)
+        category_fill = PatternFill(start_color="E6F1FB", end_color="E6F1FB", fill_type="solid")
+        
+        # Overall stats
+        ws_summary.cell(row=row, column=1, value="OVERALL STATISTICS").font = title_font
+        row += 2
+        
+        ws_summary.cell(row=row, column=1, value="Total Patients")
+        ws_summary.cell(row=row, column=2, value=stats['total_patients'])
+        row += 1
+        ws_summary.cell(row=row, column=1, value="Total Studies")
+        ws_summary.cell(row=row, column=2, value=stats['total_studies'])
+        row += 1
+        ws_summary.cell(row=row, column=1, value="Total Impacted Teeth")
+        ws_summary.cell(row=row, column=2, value=stats['total_impacted'])
+        row += 2
+        
+        # By Type
+        ws_summary.cell(row=row, column=1, value="BY TOOTH TYPE").font = category_font
+        for cell in [ws_summary.cell(row=row, column=i) for i in range(1, 3)]:
+            cell.fill = category_fill
+        row += 1
+        for tooth_type, count in sorted(stats['by_type'].items()):
+            ws_summary.cell(row=row, column=1, value=tooth_type)
+            ws_summary.cell(row=row, column=2, value=count)
+            row += 1
+        row += 1
+        
+        # Pell & Gregory Class
+        ws_summary.cell(row=row, column=1, value="PELL & GREGORY CLASS").font = category_font
+        for cell in [ws_summary.cell(row=row, column=i) for i in range(1, 3)]:
+            cell.fill = category_fill
+        row += 1
+        for pg_class, count in sorted(stats['pell_gregory_class'].items()):
+            ws_summary.cell(row=row, column=1, value=f"Class {pg_class}")
+            ws_summary.cell(row=row, column=2, value=count)
+            row += 1
+        row += 1
+        
+        # Pell & Gregory Depth
+        ws_summary.cell(row=row, column=1, value="PELL & GREGORY DEPTH").font = category_font
+        for cell in [ws_summary.cell(row=row, column=i) for i in range(1, 3)]:
+            cell.fill = category_fill
+        row += 1
+        for pg_depth, count in sorted(stats['pell_gregory_depth'].items()):
+            ws_summary.cell(row=row, column=1, value=f"Depth {pg_depth}")
+            ws_summary.cell(row=row, column=2, value=count)
+            row += 1
+        row += 1
+        
+        # Winter's Classification
+        ws_summary.cell(row=row, column=1, value="WINTER'S CLASSIFICATION").font = category_font
+        for cell in [ws_summary.cell(row=row, column=i) for i in range(1, 3)]:
+            cell.fill = category_fill
+        row += 1
+        for winters, count in sorted(stats['winters'].items(), key=lambda x: x[1], reverse=True):
+            ws_summary.cell(row=row, column=1, value=winters)
+            ws_summary.cell(row=row, column=2, value=count)
+            row += 1
+        row += 1
+        
+        # Severity
+        ws_summary.cell(row=row, column=1, value="IMPACTION SEVERITY").font = category_font
+        for cell in [ws_summary.cell(row=row, column=i) for i in range(1, 3)]:
+            cell.fill = category_fill
+        row += 1
+        for severity, count in sorted(stats['severity'].items(), key=lambda x: x[1], reverse=True):
+            ws_summary.cell(row=row, column=1, value=severity.capitalize())
+            ws_summary.cell(row=row, column=2, value=count)
+            row += 1
+        
+        ws_summary.column_dimensions['A'].width = 25
+        ws_summary.column_dimensions['B'].width = 15
+        
+        # Save workbook
+        wb.save(path)
+        log.info(f"Exported {len(rows)} records → Excel: {path}")
+
     def close(self):
         self.conn.close()
 
@@ -669,6 +850,8 @@ def main():
                         help="Output SQLite database path (default: dental_impactions.db)")
     parser.add_argument("--export-json", metavar="FILE",
                         help="Also export results to JSON")
+    parser.add_argument("--export-excel", metavar="FILE",
+                        help="Also export results to Excel (.xlsx)")
     parser.add_argument("--summary", action="store_true",
                         help="Print DB summary and exit (no DICOM processing)")
 
@@ -693,6 +876,9 @@ def main():
 
     if args.export_json:
         pipeline.db.export_json(args.export_json)
+
+    if args.export_excel:
+        pipeline.db.export_excel(args.export_excel)
 
     pipeline.close()
     print("\nDone. Database saved to:", db_path)

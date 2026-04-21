@@ -27,7 +27,7 @@ A web dashboard (`dashboard.html`) lets you browse, filter, and export results.
 ## Installation
 
 ```bash
-pip install pydicom numpy pillow
+pip install pydicom numpy pillow openpyxl
 ```
 
 ---
@@ -48,6 +48,14 @@ python impaction_analyzer.py patient1.dcm patient2.dcm --db dental_impactions.db
 ```bash
 python impaction_analyzer.py /dicoms/ --db dental_impactions.db --export-json results.json
 ```
+
+### 3b. Export results to Excel (for further analysis)
+```bash
+python impaction_analyzer.py /dicoms/ --db dental_impactions.db --export-excel results.xlsx
+```
+The Excel file includes:
+- **Detailed Records** sheet — all impacted teeth with full classification data
+- **Summary** sheet — statistics by tooth type, classification, and severity
 
 ### 4. View database summary
 ```bash
