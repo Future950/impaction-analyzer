@@ -1,14 +1,27 @@
 # ImpactScan — Dental Impaction Analyzer
-### Carestream DICOM → Impaction Classification → SQLite Database
+### Multiple Imaging Formats → Impaction Classification → SQLite Database
 
 ---
 
 ## What This Does
 
-Reads Carestream DICOM X-ray files (panoramic, periapical), detects impacted
-teeth using radiographic heuristics, classifies them using both **Pell & Gregory**
-and **Winter's** systems, and stores everything in a structured SQLite database.
-A web dashboard (`dashboard.html`) lets you browse, filter, and export results.
+Reads Carestream DICOM X-ray files (panoramic, periapical), Carestream .pano files,
+standard image formats (PNG, JPEG), and HTML-embedded images. Detects impacted teeth 
+using radiographic heuristics, classifies them using both **Pell & Gregory** and **Winter's** 
+systems, and stores everything in a structured SQLite database. A web dashboard 
+(`dashboard.html`) lets you browse, filter, and export results.
+
+---
+
+## Supported File Formats
+
+| Format | Extension | Source |
+|--------|-----------|--------|
+| DICOM | `.dcm` | Carestream/standard X-ray devices |
+| Panoramic | `.pano` | Carestream panoramic images |
+| PNG Image | `.png` | Any standard PNG file |
+| JPEG Image | `.jpg`, `.jpeg` | Any standard JPEG file |
+| HTML | `.html` | HTML with embedded images (base64 or referenced) |
 
 ---
 
@@ -34,22 +47,21 @@ pip install pydicom numpy pillow openpyxl
 
 ## Usage
 
-### 1. Process a folder of DICOM files
+### 1. Process DICOM, panoramic, or image files
 ```bash
+# Process a folder (auto-detects .dcm, .pano, .png, .jpg, .jpeg, .html)
 python impaction_analyzer.py /path/to/carestream/exports/ --db dental_impactions.db
+
+# Process specific files (mixed formats)
+python impaction_analyzer.py patient1.dcm patient2.pano image.png report.html --db dental_impactions.db
 ```
 
-### 2. Process specific files
-```bash
-python impaction_analyzer.py patient1.dcm patient2.dcm --db dental_impactions.db
-```
-
-### 3. Export results to JSON (for the dashboard)
+### 2. Export results to JSON (for the dashboard)
 ```bash
 python impaction_analyzer.py /dicoms/ --db dental_impactions.db --export-json results.json
 ```
 
-### 3b. Export results to Excel (for further analysis)
+### 3. Export results to Excel (for further analysis)
 ```bash
 python impaction_analyzer.py /dicoms/ --db dental_impactions.db --export-excel results.xlsx
 ```

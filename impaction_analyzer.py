@@ -1,9 +1,9 @@
 """
 Dental Impaction Analyzer
 =========================
-Reads Carestream DICOM files, detects impacted teeth,
-classifies them using Pell & Gregory and Winter's systems,
-and saves everything to a structured SQLite database.
+Reads Carestream DICOM files, panoramic images (.pano), standard image formats (PNG, JPEG),
+and HTML-embedded images. Detects impacted teeth, classifies them using Pell & Gregory 
+and Winter's systems, and saves everything to a structured SQLite database.
 """
 
 import os
@@ -20,9 +20,15 @@ from typing import Optional
 
 import pydicom
 import numpy as np
+from PIL import Image
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+import base64
+import struct
+import re
+from html.parser import HTMLParser
+from io import BytesIO
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -144,6 +150,193 @@ class DicomReader:
             except Exception:
                 pass
         return meta
+
+# ── Image File Readers ─────────────────────────────────────────────────────────
+class ImageReader:
+    """Reads standard image formats (PNG, JPEG) and converts to pixel array."""
+
+    def read(self, path: str) -> tuple[PatientRecord, np.ndarray]:
+        file_hash = self._hash_file(path)
+        file_name = Path(path).name
+        
+        record = PatientRecord(
+            patient_id   = f"IMG_{file_hash[:8]}",
+            patient_name = file_name,
+            dob          = "",
+            study_date   = datetime.now().strftime("%Y%m%d"),
+            study_uid    = file_hash,
+            modality     = "Image",
+            dicom_file   = str(Path(path).resolve()),
+            file_hash    = file_hash,
+            raw_metadata = {"source": "Image file", "filename": file_name},
+        )
+        
+        pixels = self._load_image(path)
+        return record, pixels
+
+    def _hash_file(self, path: str) -> str:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+
+    def _load_image(self, path: str) -> np.ndarray:
+        try:
+            img = Image.open(path)
+            # Convert to grayscale if not already
+            if img.mode != 'L':
+                img = img.convert('L')
+            # Resize to reasonable size if too large
+            max_dim = 2048
+            if max(img.size) > max_dim:
+                ratio = max_dim / max(img.size)
+                new_size = (int(img.width * ratio), int(img.height * ratio))
+                img = img.resize(new_size, Image.Resampling.LANCZOS)
+            
+            arr = np.array(img, dtype=np.float32)
+            return arr
+        except Exception as e:
+            log.error(f"Failed to load image {path}: {e}")
+            return np.zeros((512, 512), dtype=np.float32)
+
+class PanoReader:
+    """Reads Carestream .pano files (proprietary panoramic format)."""
+
+    def read(self, path: str) -> tuple[PatientRecord, np.ndarray]:
+        """
+        Carestream .pano files are typically RAW or encoded image data.
+        This attempts to extract image data and metadata.
+        """
+        file_hash = self._hash_file(path)
+        file_name = Path(path).name
+        
+        record = PatientRecord(
+            patient_id   = f"PANO_{file_hash[:8]}",
+            patient_name = file_name,
+            dob          = "",
+            study_date   = datetime.now().strftime("%Y%m%d"),
+            study_uid    = file_hash,
+            modality     = "Panoramic",
+            dicom_file   = str(Path(path).resolve()),
+            file_hash    = file_hash,
+            raw_metadata = {"source": "Carestream .pano file", "filename": file_name},
+        )
+        
+        pixels = self._extract_pano_image(path)
+        return record, pixels
+
+    def _hash_file(self, path: str) -> str:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+
+    def _extract_pano_image(self, path: str) -> np.ndarray:
+        """
+        Attempt to extract image from .pano file.
+        Carestream .pano files may contain JPEG-encoded data or raw pixel data.
+        """
+        try:
+            with open(path, "rb") as f:
+                data = f.read()
+            
+            # Look for JPEG marker (FFD8 FFE0/FFE1/FFE8/FFDB)
+            jpeg_start = data.find(b'\xff\xd8')
+            if jpeg_start != -1:
+                # Try to find JPEG end (FFD9)
+                jpeg_end = data.find(b'\xff\xd9', jpeg_start)
+                if jpeg_end != -1:
+                    jpeg_data = data[jpeg_start:jpeg_end+2]
+                    img = Image.open(BytesIO(jpeg_data))
+                    if img.mode != 'L':
+                        img = img.convert('L')
+                    return np.array(img, dtype=np.float32)
+            
+            # If no JPEG, try to treat as raw grayscale
+            # Assume standard panoramic size: 2400x1200 or 1200x800
+            file_size = len(data)
+            if file_size == 2400 * 1200:
+                arr = np.frombuffer(data, dtype=np.uint8).reshape(1200, 2400)
+                return arr.astype(np.float32)
+            elif file_size == 1200 * 800:
+                arr = np.frombuffer(data, dtype=np.uint8).reshape(800, 1200)
+                return arr.astype(np.float32)
+            
+            log.warning(f"Could not determine .pano format; file size: {file_size}")
+            return np.zeros((512, 512), dtype=np.float32)
+        except Exception as e:
+            log.error(f"Failed to read .pano file: {e}")
+            return np.zeros((512, 512), dtype=np.float32)
+
+class HtmlImageReader:
+    """Extracts image data from HTML files (embedded base64 or referenced images)."""
+
+    def read(self, path: str) -> tuple[PatientRecord, np.ndarray]:
+        file_hash = self._hash_file(path)
+        file_name = Path(path).name
+        
+        record = PatientRecord(
+            patient_id   = f"HTML_{file_hash[:8]}",
+            patient_name = file_name,
+            dob          = "",
+            study_date   = datetime.now().strftime("%Y%m%d"),
+            study_uid    = file_hash,
+            modality     = "HTML-Image",
+            dicom_file   = str(Path(path).resolve()),
+            file_hash    = file_hash,
+            raw_metadata = {"source": "HTML document with embedded image", "filename": file_name},
+        )
+        
+        pixels = self._extract_image_from_html(path)
+        return record, pixels
+
+    def _hash_file(self, path: str) -> str:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+
+    def _extract_image_from_html(self, path: str) -> np.ndarray:
+        """Extract first image from HTML (base64 embedded or file reference)."""
+        try:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                html_content = f.read()
+            
+            # Look for base64-encoded images in data URIs
+            base64_pattern = r'data:image/(png|jpeg|jpg);base64,([a-zA-Z0-9+/=]+)'
+            matches = re.findall(base64_pattern, html_content)
+            if matches:
+                _, b64_data = matches[0]
+                try:
+                    img_data = base64.b64decode(b64_data)
+                    img = Image.open(BytesIO(img_data))
+                    if img.mode != 'L':
+                        img = img.convert('L')
+                    return np.array(img, dtype=np.float32)
+                except Exception:
+                    pass
+            
+            # Look for image file references in src attributes
+            src_pattern = r'src=["\']([^"\']+(?:\.png|\.jpg|\.jpeg))["\']'
+            matches = re.findall(src_pattern, html_content, re.IGNORECASE)
+            if matches:
+                img_file = matches[0]
+                # Try relative path first
+                img_path = Path(path).parent / img_file
+                if img_path.exists():
+                    img = Image.open(img_path)
+                    if img.mode != 'L':
+                        img = img.convert('L')
+                    return np.array(img, dtype=np.float32)
+            
+            log.warning(f"No embedded or referenced images found in {path}")
+            return np.zeros((512, 512), dtype=np.float32)
+        except Exception as e:
+            log.error(f"Failed to extract image from HTML: {e}")
+            return np.zeros((512, 512), dtype=np.float32)
 
 # ── Impaction Classifier ───────────────────────────────────────────────────────
 class ImpactionClassifier:
@@ -787,9 +980,27 @@ class ImpactionDatabase:
 class ImpactionPipeline:
 
     def __init__(self, db_path: str):
-        self.reader     = DicomReader()
-        self.classifier = ImpactionClassifier()
-        self.db         = ImpactionDatabase(db_path)
+        self.dicom_reader = DicomReader()
+        self.image_reader = ImageReader()
+        self.pano_reader  = PanoReader()
+        self.html_reader  = HtmlImageReader()
+        self.classifier   = ImpactionClassifier()
+        self.db           = ImpactionDatabase(db_path)
+
+    def _get_reader(self, file_path: str):
+        """Select appropriate reader based on file extension."""
+        ext = Path(file_path).suffix.lower()
+        if ext == '.dcm':
+            return self.dicom_reader
+        elif ext == '.pano':
+            return self.pano_reader
+        elif ext in ('.png', '.jpg', '.jpeg'):
+            return self.image_reader
+        elif ext == '.html':
+            return self.html_reader
+        else:
+            log.warning(f"Unknown file type: {ext}, attempting PNG reader")
+            return self.image_reader
 
     def run(self, paths: list[str]):
         total = ok = skipped = errors = 0
@@ -797,7 +1008,8 @@ class ImpactionPipeline:
             total += 1
             log.info(f"Processing [{total}/{len(paths)}]: {Path(path).name}")
             try:
-                record, pixels = self.reader.read(path)
+                reader = self._get_reader(path)
+                record, pixels = reader.read(path)
                 record.impacted_teeth = self.classifier.classify(record, pixels)
                 self.db.save_record(record)
                 ok += 1
@@ -823,20 +1035,30 @@ class ImpactionPipeline:
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 def collect_dicoms(paths: list[str]) -> list[str]:
+    """Collect all supported imaging files: DICOM, panoramic, images, and HTML."""
+    supported_extensions = (".dcm", ".dicom", ".pano", ".png", ".jpg", ".jpeg", ".html")
     files = []
+    
     for p in paths:
         if os.path.isdir(p):
             for root, _, fnames in os.walk(p):
                 for fn in fnames:
-                    if fn.lower().endswith((".dcm", ".dicom", "")):
+                    if fn.lower().endswith(supported_extensions):
                         full = os.path.join(root, fn)
                         try:
-                            pydicom.dcmread(full, stop_before_pixels=True, force=True)
+                            # Validate DICOM files before adding
+                            if fn.lower().endswith((".dcm", ".dicom")):
+                                pydicom.dcmread(full, stop_before_pixels=True, force=True)
+                            # For other formats, just check if file exists
+                            elif os.path.isfile(full):
+                                pass
                             files.append(full)
                         except Exception:
                             pass
         elif os.path.isfile(p):
-            files.append(p)
+            if p.lower().endswith(supported_extensions):
+                files.append(p)
+    
     return sorted(set(files))
 
 
