@@ -2,8 +2,9 @@
 Dental Impaction Analyzer
 =========================
 Reads Carestream DICOM files, panoramic images (.pano), standard image formats (PNG, JPEG),
-and HTML-embedded images. Detects impacted teeth, classifies them using Pell & Gregory 
-and Winter's systems, and saves everything to a structured SQLite database.
+HTML-embedded images, and CSI data files. Detects impacted teeth, classifies them using 
+Pell & Gregory and Winter's systems, and saves everything to a structured SQLite database.
+Supports CSI data conversion to JSON for further analysis.
 """
 
 import os
@@ -29,6 +30,8 @@ import struct
 import re
 from html.parser import HTMLParser
 from io import BytesIO
+import xml.etree.ElementTree as ET
+import csv
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -337,6 +340,177 @@ class HtmlImageReader:
         except Exception as e:
             log.error(f"Failed to extract image from HTML: {e}")
             return np.zeros((512, 512), dtype=np.float32)
+
+class CsiDataReader:
+    """
+    Reads Carestream CSI (Clinical System Interface) .csi_data files.
+    Handles multiple formats: JSON, XML, CSV, TSV, and structured text.
+    """
+
+    def read(self, path: str) -> tuple[PatientRecord, np.ndarray]:
+        """Read .csi_data file and extract patient/study data."""
+        file_hash = self._hash_file(path)
+        file_name = Path(path).name
+        
+        # Try to parse the CSI data
+        csi_data = self._parse_csi_data(path)
+        
+        # Extract patient information
+        patient_id = csi_data.get("patient_id", csi_data.get("PatientID", f"CSI_{file_hash[:8]}"))
+        patient_name = csi_data.get("patient_name", csi_data.get("PatientName", file_name))
+        dob = csi_data.get("dob", csi_data.get("PatientBirthDate", ""))
+        study_date = csi_data.get("study_date", csi_data.get("StudyDate", datetime.now().strftime("%Y%m%d")))
+        study_uid = csi_data.get("study_uid", csi_data.get("StudyInstanceUID", file_hash))
+        modality = csi_data.get("modality", csi_data.get("Modality", "CSI"))
+        
+        record = PatientRecord(
+            patient_id   = str(patient_id),
+            patient_name = str(patient_name),
+            dob          = str(dob),
+            study_date   = str(study_date),
+            study_uid    = str(study_uid),
+            modality     = str(modality),
+            dicom_file   = str(Path(path).resolve()),
+            file_hash    = file_hash,
+            raw_metadata = csi_data,
+        )
+        
+        # Create a placeholder pixel array (CSI files typically don't contain images)
+        pixels = np.zeros((512, 512), dtype=np.float32)
+        return record, pixels
+
+    def _hash_file(self, path: str) -> str:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+
+    def _parse_csi_data(self, path: str) -> dict:
+        """Try to parse CSI data in multiple formats."""
+        try:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read().strip()
+            
+            # Try JSON format
+            if content.startswith('{') or content.startswith('['):
+                try:
+                    return json.loads(content)
+                except json.JSONDecodeError:
+                    pass
+            
+            # Try XML format
+            if content.startswith('<'):
+                try:
+                    return self._parse_xml_to_dict(content)
+                except Exception:
+                    pass
+            
+            # Try CSV/TSV format
+            if ',' in content or '\t' in content:
+                try:
+                    return self._parse_csv_to_dict(content)
+                except Exception:
+                    pass
+            
+            # Try key=value pairs format
+            if '=' in content:
+                try:
+                    return self._parse_keyvalue_to_dict(content)
+                except Exception:
+                    pass
+            
+            # If all else fails, return content as-is
+            log.warning(f"Could not parse CSI data format; treating as text")
+            return {"raw_content": content, "format": "unknown"}
+        
+        except Exception as e:
+            log.error(f"Failed to read CSI data file: {e}")
+            return {}
+
+    def _parse_xml_to_dict(self, xml_content: str) -> dict:
+        """Convert XML to dictionary."""
+        root = ET.fromstring(xml_content)
+        return self._xml_element_to_dict(root)
+
+    def _xml_element_to_dict(self, elem) -> dict:
+        """Recursively convert XML element to dict."""
+        result = {elem.tag: {} if elem.attrib else None}
+        children = list(elem)
+        
+        if children:
+            dd = {}
+            for child in children:
+                child_dict = self._xml_element_to_dict(child)
+                for k, v in child_dict.items():
+                    if k in dd:
+                        if isinstance(dd[k], list):
+                            dd[k].append(v)
+                        else:
+                            dd[k] = [dd[k], v]
+                    else:
+                        dd[k] = v
+            result = {elem.tag: dd}
+        
+        if elem.text and elem.text.strip():
+            text = elem.text.strip()
+            if children or elem.attrib:
+                if result[elem.tag] is None:
+                    result[elem.tag] = text
+                else:
+                    result[elem.tag]["#text"] = text
+            else:
+                result[elem.tag] = text
+        
+        if elem.attrib:
+            if result[elem.tag] is None:
+                result[elem.tag] = elem.attrib
+            else:
+                result[elem.tag]["@attributes"] = elem.attrib
+        
+        return result
+
+    def _parse_csv_to_dict(self, csv_content: str) -> dict:
+        """Convert CSV content to dictionary."""
+        lines = csv_content.strip().split('\n')
+        if not lines:
+            return {}
+        
+        # Detect delimiter
+        delimiter = ',' if ',' in lines[0] else '\t'
+        
+        reader = csv.DictReader(lines, delimiter=delimiter)
+        records = list(reader)
+        
+        if not records:
+            return {}
+        
+        # If single row, return as dict
+        if len(records) == 1:
+            return records[0]
+        
+        # If multiple rows, return as list of dicts
+        return {"records": records}
+
+    def _parse_keyvalue_to_dict(self, content: str) -> dict:
+        """Parse key=value format."""
+        result = {}
+        for line in content.split('\n'):
+            line = line.strip()
+            if '=' in line and not line.startswith('#'):
+                key, value = line.split('=', 1)
+                result[key.strip()] = value.strip()
+        
+        return result
+
+    def export_to_json(self, csi_data: dict, output_path: str):
+        """Export parsed CSI data to JSON file."""
+        try:
+            with open(output_path, 'w') as f:
+                json.dump(csi_data, f, indent=2, default=str)
+            log.info(f"Exported CSI data to {output_path}")
+        except Exception as e:
+            log.error(f"Failed to export JSON: {e}")
 
 # ── Impaction Classifier ───────────────────────────────────────────────────────
 class ImpactionClassifier:
@@ -984,6 +1158,7 @@ class ImpactionPipeline:
         self.image_reader = ImageReader()
         self.pano_reader  = PanoReader()
         self.html_reader  = HtmlImageReader()
+        self.csi_reader   = CsiDataReader()
         self.classifier   = ImpactionClassifier()
         self.db           = ImpactionDatabase(db_path)
 
@@ -998,8 +1173,10 @@ class ImpactionPipeline:
             return self.image_reader
         elif ext == '.html':
             return self.html_reader
+        elif ext == '.csi_data':
+            return self.csi_reader
         else:
-            log.warning(f"Unknown file type: {ext}, attempting PNG reader")
+            log.warning(f"Unknown file type: {ext}, attempting generic image reader")
             return self.image_reader
 
     def run(self, paths: list[str]):
@@ -1035,8 +1212,8 @@ class ImpactionPipeline:
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 def collect_dicoms(paths: list[str]) -> list[str]:
-    """Collect all supported imaging files: DICOM, panoramic, images, and HTML."""
-    supported_extensions = (".dcm", ".dicom", ".pano", ".png", ".jpg", ".jpeg", ".html")
+    """Collect all supported imaging files: DICOM, panoramic, images, HTML, and CSI data."""
+    supported_extensions = (".dcm", ".dicom", ".pano", ".png", ".jpg", ".jpeg", ".html", ".csi_data")
     files = []
     
     for p in paths:
@@ -1062,23 +1239,80 @@ def collect_dicoms(paths: list[str]) -> list[str]:
     return sorted(set(files))
 
 
+def convert_csi_to_json(csi_files: list[str], output_dir: str = None):
+    """Convert CSI data files to JSON format."""
+    reader = CsiDataReader()
+    converted = 0
+    errors = 0
+    
+    for csi_file in csi_files:
+        try:
+            csi_data = reader._parse_csi_data(csi_file)
+            
+            # Determine output path
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+                base_name = Path(csi_file).stem
+                json_path = os.path.join(output_dir, f"{base_name}.json")
+            else:
+                json_path = str(Path(csi_file).with_suffix('.json'))
+            
+            # Write JSON
+            with open(json_path, 'w') as f:
+                json.dump(csi_data, f, indent=2, default=str)
+            
+            log.info(f"✓ Converted: {Path(csi_file).name} → {Path(json_path).name}")
+            converted += 1
+        except Exception as e:
+            log.error(f"✗ Failed to convert {Path(csi_file).name}: {e}")
+            errors += 1
+    
+    log.info(f"\nCSI Conversion Summary:")
+    log.info(f"  Converted: {converted}")
+    log.info(f"  Errors:    {errors}")
+    return converted, errors
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Dental Impaction Analyzer — Carestream DICOM → SQLite"
+        description="Dental Impaction Analyzer — Multi-format imaging → SQLite + JSON/Excel export"
     )
-    parser.add_argument("inputs", nargs="+",
-                        help="DICOM files or directories to process")
+    parser.add_argument("inputs", nargs="*",
+                        help="DICOM, panoramic, image, HTML, or CSI data files/directories to process")
     parser.add_argument("--db",  default="dental_impactions.db",
                         help="Output SQLite database path (default: dental_impactions.db)")
     parser.add_argument("--export-json", metavar="FILE",
-                        help="Also export results to JSON")
+                        help="Export impaction results to JSON")
     parser.add_argument("--export-excel", metavar="FILE",
-                        help="Also export results to Excel (.xlsx)")
+                        help="Export impaction results to Excel (.xlsx)")
+    parser.add_argument("--convert-csi", metavar="OUTPUT_DIR",
+                        help="Convert CSI data files to JSON (specify output directory)")
     parser.add_argument("--summary", action="store_true",
-                        help="Print DB summary and exit (no DICOM processing)")
+                        help="Print DB summary and exit (no processing)")
 
     args = parser.parse_args()
 
+    # If converting CSI to JSON only
+    if args.convert_csi:
+        if not args.inputs:
+            log.error("No input files specified for CSI conversion")
+            sys.exit(1)
+        
+        csi_files = [f for f in args.inputs if f.lower().endswith('.csi_data')]
+        if csi_files:
+            converted, errors = convert_csi_to_json(csi_files, args.convert_csi)
+            sys.exit(0 if errors == 0 else 1)
+        else:
+            # Collect CSI files from directories
+            all_files = collect_dicoms(args.inputs)
+            csi_files = [f for f in all_files if f.lower().endswith('.csi_data')]
+            if csi_files:
+                converted, errors = convert_csi_to_json(csi_files, args.convert_csi)
+                sys.exit(0 if errors == 0 else 1)
+            else:
+                log.error("No CSI data files found")
+                sys.exit(1)
+    
     db_path  = args.db
     pipeline = ImpactionPipeline(db_path)
 
@@ -1088,12 +1322,16 @@ def main():
         pipeline.close()
         return
 
-    dicom_files = collect_dicoms(args.inputs)
-    if not dicom_files:
-        log.error("No valid DICOM files found in the given paths.")
+    if not args.inputs:
+        parser.print_help()
         sys.exit(1)
 
-    log.info(f"Found {len(dicom_files)} DICOM file(s)")
+    dicom_files = collect_dicoms(args.inputs)
+    if not dicom_files:
+        log.error("No valid imaging files found in the given paths.")
+        sys.exit(1)
+
+    log.info(f"Found {len(dicom_files)} imaging file(s)")
     stats = pipeline.run(dicom_files)
 
     if args.export_json:

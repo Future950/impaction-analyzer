@@ -22,6 +22,7 @@ systems, and stores everything in a structured SQLite database. A web dashboard
 | PNG Image | `.png` | Any standard PNG file |
 | JPEG Image | `.jpg`, `.jpeg` | Any standard JPEG file |
 | HTML | `.html` | HTML with embedded images (base64 or referenced) |
+| CSI Data | `.csi_data` | Carestream Clinical System Interface data (JSON, XML, CSV, key=value) |
 
 ---
 
@@ -74,7 +75,23 @@ The Excel file includes:
 python impaction_analyzer.py --summary --db dental_impactions.db
 ```
 
-### 5. Generate test DICOM files
+### 5. Convert CSI data files to JSON
+```bash
+# Convert CSI data files to JSON format
+python impaction_analyzer.py patient1.csi_data patient2.csi_data --convert-csi ./output_json/
+
+# Or convert from directory
+python impaction_analyzer.py /path/to/csi/files/ --convert-csi ./output_json/
+```
+
+**Supported CSI formats:**
+- JSON (native)
+- XML
+- CSV / TSV
+- Key=value pairs
+- Structured text
+
+### 6. Generate test DICOM files
 ```bash
 python generate_test_dicoms.py
 python impaction_analyzer.py test_dicoms/ --db dental_impactions.db --export-json results.json
