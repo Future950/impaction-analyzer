@@ -397,6 +397,160 @@
 
   /* ── Progress bar ── */
   .progress-wrap { display: none; }
+  /* ── Responsive Design ── */
+  @media (max-width: 1200px) {
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .charts-2col { grid-template-columns: 1fr; }
+    .classification-grid { grid-template-columns: 1fr; }
+    main { padding: 1.5rem 2rem; }
+  }
+
+  @media (max-width: 768px) {
+    header { padding: 0 1rem; gap: 1rem; height: 52px; }
+    .logo-name { font-size: 15px; }
+    .logo-icon { width: 28px; height: 28px; }
+    .badge-version { display: none; }
+    
+    .shell { flex-direction: column; }
+    aside {
+      width: 100%;
+      min-width: auto;
+      border-right: none;
+      border-bottom: 0.5px solid var(--border);
+      padding: 0.75rem 0;
+      flex-direction: row;
+      gap: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .nav-label { display: none; }
+    .nav-item {
+      padding: 0.5rem 1rem;
+      white-space: nowrap;
+      border-left: none;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+    }
+    .nav-item:hover { border-bottom-color: var(--surface2); }
+    .nav-item.active {
+      background: transparent;
+      border-bottom-color: var(--accent);
+      color: var(--accent-text);
+    }
+    .nav-count { display: none; }
+    
+    main {
+      flex: 1;
+      padding: 1.25rem 1rem;
+      overflow-y: auto;
+      max-width: 100%;
+    }
+    
+    .page-title { font-size: 22px; }
+    .metrics { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .metric-card { padding: 0.9rem 1rem; }
+    .metric-value { font-size: 28px; }
+    .metric-label { font-size: 10px; }
+    .metric-sub { font-size: 10px; }
+    
+    .card { padding: 1rem 1.1rem; }
+    .card-title { margin-bottom: 1rem; }
+    
+    .filter-bar { gap: 0.5rem; }
+    .filter-bar select, .filter-bar input {
+      font-size: 11px;
+      padding: 0.35rem 0.6rem;
+    }
+    
+    .tooth-box { width: 32px; height: 32px; font-size: 9px; }
+    .tooth-map-wrap { padding: 1rem 0; }
+    
+    table { font-size: 12px; }
+    thead th { padding: 0.5rem 0.6rem; font-size: 10px; }
+    tbody td { padding: 0.5rem 0.6rem; }
+    
+    .charts-2col { grid-template-columns: 1fr; }
+    .classification-grid { grid-template-columns: 1fr; }
+    
+    .class-key { font-size: 14px; min-width: 28px; }
+    .class-item { padding: 0.6rem 0.8rem; }
+    .class-text { font-size: 11px; }
+  }
+
+  @media (max-width: 480px) {
+    header { height: 48px; padding: 0 0.75rem; }
+    .logo-icon { width: 26px; height: 26px; }
+    .logo-icon svg { width: 16px; height: 16px; }
+    .logo-name { font-size: 14px; }
+    
+    aside { gap: 0; }
+    .nav-item { padding: 0.45rem 0.8rem; font-size: 12px; }
+    .nav-dot { width: 6px; height: 6px; }
+    
+    main { padding: 1rem 0.75rem; }
+    .page-title { font-size: 19px; margin-bottom: 0.5rem; }
+    .page-sub { font-size: 12px; margin-bottom: 1.5rem; }
+    
+    .metrics { grid-template-columns: 1fr; gap: 8px; margin-bottom: 1.5rem; }
+    .metric-card { padding: 0.8rem 0.9rem; }
+    .metric-value { font-size: 24px; }
+    .metric-label { font-size: 9px; }
+    
+    .card { padding: 0.9rem 1rem; margin-bottom: 1rem; }
+    .card-title { font-size: 12px; margin-bottom: 0.9rem; }
+    
+    .filter-bar { gap: 0.4rem; margin-bottom: 1rem; }
+    .filter-bar select, .filter-bar input {
+      font-size: 10px;
+      padding: 0.3rem 0.5rem;
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .tooth-box { width: 28px; height: 28px; font-size: 8px; gap: 2px; }
+    .arch-row { gap: 3px; }
+    .arch-spacer { height: 6px; }
+    .tooth-legend { flex-direction: column; gap: 0.5rem; font-size: 10px; }
+    
+    table { font-size: 11px; }
+    thead th { padding: 0.4rem 0.5rem; font-size: 9px; }
+    tbody td { padding: 0.4rem 0.5rem; }
+    
+    .class-key { font-size: 13px; }
+    .class-item { padding: 0.5rem 0.7rem; }
+    .class-heading { font-size: 16px; }
+    .class-text { font-size: 10px; }
+    
+    .btn { font-size: 11px; padding: 0.4rem 0.8rem; }
+    
+    .upload-area { padding: 2rem 1rem; }
+    .upload-icon { font-size: 2rem; }
+    .upload-title { font-size: 14px; }
+    .upload-sub { font-size: 11px; }
+  }
+
+  /* ── Smooth scrolling ── */
+  html { scroll-behavior: smooth; }
+  
+  /* ── Transitions ── */
+  * {
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  
+  /* ── Accessibility ── */
+  button:focus, input:focus, select:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* ── Print styles ── */
+  @media print {
+    header, aside { display: none; }
+    main { padding: 0; max-width: 100%; }
+    .filter-bar, .btn { display: none; }
+  }
+  /* ── Progress bar ── */
+  .progress-wrap { display: none; }
   .progress-bar {
     height: 6px;
     background: var(--surface2);
@@ -431,13 +585,6 @@
   .log-err  { color: #F0997B; }
   .log-info { color: #85B7EB; }
   .log-hit  { color: #FAC775; }
-
-  /* ── Responsive ── */
-  @media (max-width: 900px) {
-    .metrics { grid-template-columns: repeat(2, 1fr); }
-    .charts-2col { grid-template-columns: 1fr; }
-    .classification-grid { grid-template-columns: 1fr; }
-  }
 </style>
 </head>
 <body>
