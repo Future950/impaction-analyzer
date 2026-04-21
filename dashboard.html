@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dental Impaction Analyzer — Dashboard</title>
+<style>
+  :root {
+    --bg: #f7f6f2;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --border: rgba(0,0,0,0.10);
+    --border2: rgba(0,0,0,0.18);
+    --text: #1a1a18;
+    --text2: #5a5955;
+    --text3: #8a8880;
+    --accent: #185FA5;
+    --accent-light: #E6F1FB;
+    --accent-text: #0C447C;
+    --success: #0F6E56;
+    --success-light: #E1F5EE;
+    --warn: #854F0B;
+    --warn-light: #FAEEDA;
+    --danger: #A32D2D;
+    --danger-light: #FCEBEB;
+    --purple: #534AB7;
+    --purple-light: #EEEDFE;
+    --r-sm: 6px;
+    --r-md: 10px;
+    --r-lg: 14px;
+    --font: 'Crimson Text', Georgia, serif;
+    --font-ui: 'DM Sans', system-ui, sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-ui);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border2);
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-icon {
+    width: 30px; height: 30px;
+    background: var(--accent);
+    border-radius: var(--r-sm);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo-icon svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 2; }
+  .logo-name {
+    font-family: var(--font);
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .logo-sub {
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
+  .badge-version {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: var(--accent-light);
+    color: var(--accent-text);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Layout ── */
+  .shell { display: flex; min-height: calc(100vh - 56px); }
+
+  /* ── Sidebar ── */
+  aside {
+    width: 220px;
+    min-width: 220px;
+    background: var(--surface);
+    border-right: 0.5px solid var(--border);
+    padding: 1.5rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .nav-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    color: var(--text3);
+    padding: 0.75rem 1.25rem 0.4rem;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.55rem 1.25rem;
+    font-size: 13px;
+    color: var(--text2);
+    cursor: pointer;
+    border-radius: 0;
+    transition: background 0.15s;
+    border-left: 2px solid transparent;
+  }
+  .nav-item:hover { background: var(--surface2); }
+  .nav-item.active {
+    background: var(--accent-light);
+    color: var(--accent-text);
+    border-left-color: var(--accent);
+    font-weight: 500;
+  }
+  .nav-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.5;
+  }
+  .nav-count {
+    margin-left: auto;
+    font-size: 11px;
+    background: var(--surface2);
+    padding: 1px 6px;
+    border-radius: 10px;
+    color: var(--text3);
+  }
+  .nav-item.active .nav-count {
+    background: var(--accent);
+    color: white;
+  }
+
+  /* ── Main content ── */
+  main {
+    flex: 1;
+    padding: 2rem 2.5rem;
+    overflow-y: auto;
+    max-width: 1100px;
+  }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Section headings ── */
+  .page-title {
+    font-family: var(--font);
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.3rem;
+    letter-spacing: -0.02em;
+  }
+  .page-sub {
+    font-size: 13px;
+    color: var(--text3);
+    margin-bottom: 2rem;
+  }
+
+  /* ── Metric cards ── */
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 2rem; }
+  .metric-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 1.1rem 1.25rem;
+  }
+  .metric-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 0.5rem; }
+  .metric-value { font-family: var(--font); font-size: 32px; font-weight: 600; letter-spacing: -0.03em; color: var(--text); line-height: 1; }
+  .metric-sub { font-size: 11px; color: var(--text3); margin-top: 0.4rem; }
+
+  /* ── Cards / panels ── */
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text3);
+    margin-bottom: 1.2rem;
+  }
+
+  /* ── Charts grid ── */
+  .charts-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.5rem; }
+
+  /* ── Table ── */
+  .tbl-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    text-align: left;
+    padding: 0.6rem 0.85rem;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text3);
+    background: var(--surface2);
+    border-bottom: 0.5px solid var(--border2);
+    font-weight: 500;
+  }
+  tbody td {
+    padding: 0.7rem 0.85rem;
+    border-bottom: 0.5px solid var(--border);
+    color: var(--text);
+    vertical-align: middle;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--bg); }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.02em;
+  }
+  .badge-wisdom   { background: var(--purple-light); color: var(--purple); }
+  .badge-canine   { background: var(--accent-light); color: var(--accent-text); }
+  .badge-premolar { background: var(--success-light); color: var(--success); }
+  .badge-other    { background: var(--surface2); color: var(--text2); }
+  .badge-mild     { background: var(--success-light); color: var(--success); }
+  .badge-moderate { background: var(--warn-light); color: var(--warn); }
+  .badge-severe   { background: var(--danger-light); color: var(--danger); }
+  .badge-pg       { background: var(--surface2); color: var(--text); font-family: monospace; }
+  .badge-winters  { background: var(--warn-light); color: var(--warn); }
+
+  /* ── Filter bar ── */
+  .filter-bar {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+  .filter-bar select, .filter-bar input {
+    font-size: 12px;
+    padding: 0.4rem 0.75rem;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+    cursor: pointer;
+  }
+  .filter-bar select:focus, .filter-bar input:focus { border-color: var(--accent); }
+
+  /* ── Classification diagram ── */
+  .classification-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .class-section { }
+  .class-heading {
+    font-family: var(--font);
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    letter-spacing: -0.01em;
+  }
+  .class-desc { font-size: 12px; color: var(--text3); margin-bottom: 1rem; }
+  .class-items { display: flex; flex-direction: column; gap: 0.6rem; }
+  .class-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: var(--surface2);
+    border-radius: var(--r-md);
+    padding: 0.75rem 1rem;
+    border: 0.5px solid var(--border);
+  }
+  .class-key {
+    font-family: monospace;
+    font-size: 15px;
+    font-weight: 700;
+    min-width: 32px;
+    color: var(--accent);
+    line-height: 1.2;
+  }
+  .class-text { font-size: 12px; color: var(--text2); line-height: 1.5; }
+  .class-name { font-weight: 500; color: var(--text); font-size: 13px; }
+
+  /* ── Tooth map ── */
+  .tooth-map-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.5rem 0;
+  }
+  .arch-row { display: flex; gap: 4px; }
+  .tooth-box {
+    width: 36px; height: 36px;
+    border-radius: 4px;
+    border: 1.5px solid var(--border2);
+    background: var(--surface2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    color: var(--text3);
+    cursor: default;
+    transition: transform 0.1s;
+    position: relative;
+  }
+  .tooth-box.impacted {
+    background: var(--danger-light);
+    border-color: var(--danger);
+    color: var(--danger);
+    font-weight: 600;
+  }
+  .tooth-box.impacted-moderate {
+    background: var(--warn-light);
+    border-color: var(--warn);
+    color: var(--warn);
+    font-weight: 600;
+  }
+  .tooth-box.impacted-mild {
+    background: var(--accent-light);
+    border-color: var(--accent);
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+  .tooth-box:hover { transform: scale(1.12); z-index: 2; }
+  .arch-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+  .arch-spacer { height: 8px; }
+  .tooth-legend {
+    display: flex; gap: 1rem; margin-top: 1rem;
+    font-size: 11px; color: var(--text2);
+  }
+  .tooth-legend span { display: flex; align-items: center; gap: 5px; }
+  .leg-dot {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+  }
+
+  /* ── Confidence bar ── */
+  .conf-bar { width: 60px; height: 4px; background: var(--surface2); border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; }
+  .conf-fill { height: 100%; border-radius: 4px; }
+
+  /* ── Export button ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 0.45rem 1rem;
+    border-radius: var(--r-sm);
+    border: 0.5px solid var(--border2);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .btn:hover { background: var(--surface2); }
+  .btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
+  .btn-primary:hover { background: var(--accent-text); border-color: var(--accent-text); }
+
+  /* ── Upload area ── */
+  .upload-area {
+    border: 1.5px dashed var(--border2);
+    border-radius: var(--r-lg);
+    padding: 3rem 2rem;
+    text-align: center;
+    background: var(--surface2);
+    margin-bottom: 1.5rem;
+  }
+  .upload-icon { font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.4; }
+  .upload-title { font-size: 16px; font-weight: 500; margin-bottom: 0.4rem; }
+  .upload-sub { font-size: 12px; color: var(--text3); margin-bottom: 1.25rem; }
+
+  /* ── Progress bar ── */
+  .progress-wrap { display: none; }
+  .progress-bar {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+    width: 0%;
+    transition: width 0.4s ease;
+  }
+  .progress-label { font-size: 12px; color: var(--text3); }
+
+  /* ── Log stream ── */
+  .log-box {
+    background: #1a1a18;
+    color: #c8c7c0;
+    font-family: 'Courier New', monospace;
+    font-size: 11.5px;
+    border-radius: var(--r-md);
+    padding: 1rem 1.25rem;
+    max-height: 240px;
+    overflow-y: auto;
+    line-height: 1.65;
+    display: none;
+  }
+  .log-line { display: block; }
+  .log-ok   { color: #9FE1CB; }
+  .log-err  { color: #F0997B; }
+  .log-info { color: #85B7EB; }
+  .log-hit  { color: #FAC775; }
+
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .charts-2col { grid-template-columns: 1fr; }
+    .classification-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 3C8 3 5 6 5 9c0 2 1 4 3 5l1 7h6l1-7c2-1 3-3 3-5 0-3-3-6-7-6z"/></svg>
+    </div>
+    <div>
+      <div class="logo-name">ImpactScan</div>
+      <div class="logo-sub">Dental Impaction Analyzer</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="badge-version">v2.0 · FDI Standard</span>
+    <button class="btn btn-primary" onclick="nav('process')">+ Process Files</button>
+  </div>
+</header>
+
+<div class="shell">
+  <aside>
+    <div class="nav-label">Overview</div>
+    <div class="nav-item active" onclick="nav('dashboard')"><div class="nav-dot"></div> Dashboard<span class="nav-count" id="nc-dash">5</span></div>
+    <div class="nav-item" onclick="nav('map')"><div class="nav-dot"></div> Tooth Map</div>
+
+    <div class="nav-label">Classification</div>
+    <div class="nav-item" onclick="nav('table')"><div class="nav-dot"></div> All Records<span class="nav-count" id="nc-all">—</span></div>
+    <div class="nav-item" onclick="nav('wisdom')"><div class="nav-dot"></div> Wisdom Teeth<span class="nav-count" id="nc-wis">—</span></div>
+    <div class="nav-item" onclick="nav('canine')"><div class="nav-dot"></div> Canines<span class="nav-count" id="nc-can">—</span></div>
+    <div class="nav-item" onclick="nav('premolar')"><div class="nav-dot"></div> Premolars<span class="nav-count" id="nc-pre">—</span></div>
+
+    <div class="nav-label">Reference</div>
+    <div class="nav-item" onclick="nav('classification')"><div class="nav-dot"></div> Classification Guide</div>
+    <div class="nav-item" onclick="nav('process')"><div class="nav-dot"></div> Process Files</div>
+  </aside>
+
+  <main>
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-title">Overview</div>
+      <div class="page-sub">Summary of impacted teeth detected across all processed DICOM studies</div>
+
+      <div class="metrics">
+        <div class="metric-card">
+          <div class="metric-label">Total Patients</div>
+          <div class="metric-value" id="m-patients">—</div>
+          <div class="metric-sub">Studies processed</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Impacted Teeth</div>
+          <div class="metric-value" id="m-impacted" style="color:var(--danger)">—</div>
+          <div class="metric-sub">Across all studies</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Severity: Severe</div>
+          <div class="metric-value" id="m-severe" style="color:var(--warn)">—</div>
+          <div class="metric-sub">Requiring attention</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Most Common Type</div>
+          <div class="metric-value" id="m-common" style="font-size:20px; padding-top:6px">—</div>
+          <div class="metric-sub">Tooth category</div>
+        </div>
+      </div>
+
+      <div class="charts-2col">
+        <div class="card">
+          <div class="card-title">By tooth type</div>
+          <div style="position:relative; height:200px;">
+            <canvas id="chartType" role="img" aria-label="Bar chart showing impacted tooth counts by type">No data loaded.</canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Severity distribution</div>
+          <div style="position:relative; height:200px;">
+            <canvas id="chartSev" role="img" aria-label="Doughnut chart showing severity distribution">No data loaded.</canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="charts-2col">
+        <div class="card">
+          <div class="card-title">Pell & Gregory class (wisdom)</div>
+          <div style="position:relative; height:180px;">
+            <canvas id="chartPG" role="img" aria-label="Bar chart of Pell and Gregory classification">No data.</canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Winter's angulation</div>
+          <div style="position:relative; height:180px;">
+            <canvas id="chartW" role="img" aria-label="Bar chart of Winters angulation">No data.</canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOOTH MAP -->
+    <div class="page" id="page-map">
+      <div class="page-title">Tooth Map</div>
+      <div class="page-sub">Visual overview of impacted teeth across the FDI numbering system</div>
+      <div class="card">
+        <div class="tooth-map-wrap" id="toothMap">
+          <!-- rendered by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ALL RECORDS TABLE -->
+    <div class="page" id="page-table">
+      <div class="page-title">All Records</div>
+      <div class="page-sub">Every impacted tooth detected across all studies</div>
+      <div class="filter-bar">
+        <select id="fType" onchange="renderTable()">
+          <option value="">All types</option>
+          <option value="wisdom">Wisdom</option>
+          <option value="canine">Canine</option>
+          <option value="premolar">Premolar</option>
+          <option value="other">Other</option>
+        </select>
+        <select id="fSev" onchange="renderTable()">
+          <option value="">All severities</option>
+          <option value="mild">Mild</option>
+          <option value="moderate">Moderate</option>
+          <option value="severe">Severe</option>
+        </select>
+        <select id="fPG" onchange="renderTable()">
+          <option value="">All P&G classes</option>
+          <option value="I">Class I</option>
+          <option value="II">Class II</option>
+          <option value="III">Class III</option>
+        </select>
+        <input id="fSearch" placeholder="Search patient…" oninput="renderTable()" style="min-width:140px">
+        <button class="btn" onclick="exportCSV()">Export CSV</button>
+      </div>
+      <div class="card" style="padding: 0;">
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Patient</th><th>Date</th><th>Tooth (FDI)</th><th>Type</th>
+                <th>P&G Class</th><th>P&G Depth</th><th>Winter's</th>
+                <th>Severity</th><th>Confidence</th>
+              </tr>
+            </thead>
+            <tbody id="recordsTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- WISDOM / CANINE / PREMOLAR filtered pages -->
+    <div class="page" id="page-wisdom">
+      <div class="page-title">Wisdom Teeth (3rd Molars)</div>
+      <div class="page-sub">FDI 18, 28, 38, 48 — classified by Pell & Gregory and Winter's systems</div>
+      <div class="card" style="padding:0"><div class="tbl-wrap"><table>
+        <thead><tr><th>Patient</th><th>Tooth</th><th>P&G Class</th><th>P&G Depth</th><th>Winter's Angle</th><th>Severity</th><th>Conf.</th></tr></thead>
+        <tbody id="wisdomTbody"></tbody>
+      </table></div></div>
+    </div>
+
+    <div class="page" id="page-canine">
+      <div class="page-title">Canine Impactions</div>
+      <div class="page-sub">FDI 13, 23, 33, 43 — classified by Winter's angulation</div>
+      <div class="card" style="padding:0"><div class="tbl-wrap"><table>
+        <thead><tr><th>Patient</th><th>Tooth</th><th>Winter's Angle</th><th>Severity</th><th>Confidence</th></tr></thead>
+        <tbody id="canineTbody"></tbody>
+      </table></div></div>
+    </div>
+
+    <div class="page" id="page-premolar">
+      <div class="page-title">Premolar Impactions</div>
+      <div class="page-sub">FDI 14, 15, 24, 25, 34, 35, 44, 45</div>
+      <div class="card" style="padding:0"><div class="tbl-wrap"><table>
+        <thead><tr><th>Patient</th><th>Tooth</th><th>Winter's Angle</th><th>Severity</th><th>Confidence</th></tr></thead>
+        <tbody id="premolarTbody"></tbody>
+      </table></div></div>
+    </div>
+
+    <!-- CLASSIFICATION GUIDE -->
+    <div class="page" id="page-classification">
+      <div class="page-title">Classification Guide</div>
+      <div class="page-sub">Reference for Pell & Gregory and Winter's classification systems used in this analyzer</div>
+
+      <div class="classification-grid">
+        <div class="class-section">
+          <div class="class-heading">Pell & Gregory</div>
+          <div class="class-desc">Relates wisdom tooth position to the ramus of mandible (class) and occlusal plane (depth). Primary system for mandibular 3rd molars.</div>
+          <div style="font-size:12px;font-weight:500;color:var(--text3);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.06em">Class — Ramus Relationship</div>
+          <div class="class-items" style="margin-bottom:1rem">
+            <div class="class-item">
+              <div class="class-key">I</div>
+              <div><div class="class-name">Adequate space</div><div class="class-text">Crown fully anterior to the anterior ramus border — sufficient space for eruption</div></div>
+            </div>
+            <div class="class-item">
+              <div class="class-key">II</div>
+              <div><div class="class-name">Partial coverage</div><div class="class-text">Part of the crown covered by the ramus — less than full mesiodistal diameter available</div></div>
+            </div>
+            <div class="class-item">
+              <div class="class-key">III</div>
+              <div><div class="class-name">Full inclusion</div><div class="class-text">Tooth completely embedded within the ramus — no space for eruption</div></div>
+            </div>
+          </div>
+          <div style="font-size:12px;font-weight:500;color:var(--text3);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.06em">Depth — Occlusal Plane</div>
+          <div class="class-items">
+            <div class="class-item">
+              <div class="class-key">A</div>
+              <div><div class="class-name">Coronal level</div><div class="class-text">Highest point of crown at or above the occlusal plane of the 2nd molar</div></div>
+            </div>
+            <div class="class-item">
+              <div class="class-key">B</div>
+              <div><div class="class-name">Mid level</div><div class="class-text">Crown between occlusal plane and cervical line of the 2nd molar</div></div>
+            </div>
+            <div class="class-item">
+              <div class="class-key">C</div>
+              <div><div class="class-name">Apical level</div><div class="class-text">Crown below the cervical line of the 2nd molar — deeply impacted</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="class-section">
+          <div class="class-heading">Winter's Classification</div>
+          <div class="class-desc">Describes the angulation of the long axis of the impacted tooth relative to the long axis of the adjacent 2nd molar.</div>
+          <div class="class-items">
+            <div class="class-item">
+              <div class="class-key" style="color:var(--warn)">MA</div>
+              <div><div class="class-name">Mesioangular</div><div class="class-text">Crown tilted toward the 2nd molar (~30–80°). Most common type. Higher risk of 2nd molar root resorption.</div></div>
+            </div>
+            <div class="class-item">
+              <div class="class-key" style="color:var(--danger)">DA</div>
+              <div><div class="class-name">Distoangular</div><div class="class-text">Crown tilted away from 2nd molar (~-30 to -80°). Most difficult surgical access.</div></div>
+            </div>
+            <div class="class-item">
+              <div class="class-key" style="color:var(--accent)">V</div>
+              <div><div class="class-name">Vertical</div><div class="class-text">Crown parallel to 2nd molar (&lt;30°). Second most common. Moderate extraction difficulty.</div></div>
+            </div>
+            <div class="class-item">
+              <div class="class-key" style="color:var(--danger)">H</div>
+              <div><div class="class-name">Horizontal</div><div class="class-text">Long axis perpendicular to 2nd molar (&gt;80°). Crown pointing directly at root. Complex extraction.</div></div>
+            </div>
+            <div class="class-item">
+              <div class="class-key" style="color:var(--success)">T</div>
+              <div><div class="class-name">Transverse</div><div class="class-text">Tooth tilted bucco-lingually. Crown not visible in panoramic — CBCT required for full assessment.</div></div>
+            </div>
+            <div class="class-item">
+              <div class="class-key" style="color:var(--text3)">IN</div>
+              <div><div class="class-name">Inverted</div><div class="class-text">Crown facing apically (upside-down). Rarest form. Often associated with cyst formation.</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROCESS FILES -->
+    <div class="page" id="page-process">
+      <div class="page-title">Process DICOM Files</div>
+      <div class="page-sub">Run the analyzer on your Carestream DICOM exports and populate the database</div>
+
+      <div class="card">
+        <div class="card-title">Command line usage</div>
+        <div style="background:#1a1a18;color:#c8c7c0;font-family:monospace;font-size:12px;border-radius:var(--r-md);padding:1rem 1.25rem;line-height:1.8">
+          <span style="color:#9FE1CB"># Process a folder of DICOM files</span><br>
+          <span style="color:#85B7EB">python</span> impaction_analyzer.py <span style="color:#FAC775">/path/to/dicoms/</span> --db dental_impactions.db<br><br>
+          <span style="color:#9FE1CB"># Process specific files</span><br>
+          <span style="color:#85B7EB">python</span> impaction_analyzer.py <span style="color:#FAC775">patient1.dcm patient2.dcm</span> --db dental_impactions.db<br><br>
+          <span style="color:#9FE1CB"># Also export JSON</span><br>
+          <span style="color:#85B7EB">python</span> impaction_analyzer.py <span style="color:#FAC775">/dicoms/</span> --db dental_impactions.db --export-json results.json<br><br>
+          <span style="color:#9FE1CB"># View database summary only</span><br>
+          <span style="color:#85B7EB">python</span> impaction_analyzer.py --summary --db dental_impactions.db
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Load results JSON</div>
+        <div class="upload-area">
+          <div class="upload-icon">📂</div>
+          <div class="upload-title">Load results.json</div>
+          <div class="upload-sub">After running the analyzer, load the exported JSON file to view results in this dashboard</div>
+          <input type="file" id="fileInput" accept=".json" style="display:none" onchange="loadJSON(event)">
+          <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">Choose File</button>
+        </div>
+
+        <div class="progress-wrap" id="progressWrap">
+          <div class="progress-label" id="progressLabel">Processing…</div>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        </div>
+        <div class="log-box" id="logBox"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Load demo data</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:1rem">Load a synthetic dataset of 12 impacted teeth to explore the dashboard without running the analyzer.</p>
+        <button class="btn btn-primary" onclick="loadDemo()">Load Demo Dataset</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+let allRecords = [];
+let charts = {};
+const FDI_NAMES = {
+  11:"UR Central Incisor",12:"UR Lateral Incisor",13:"UR Canine",
+  14:"UR 1st Premolar",15:"UR 2nd Premolar",16:"UR 1st Molar",17:"UR 2nd Molar",18:"UR 3rd Molar",
+  21:"UL Central Incisor",22:"UL Lateral Incisor",23:"UL Canine",
+  24:"UL 1st Premolar",25:"UL 2nd Premolar",26:"UL 1st Molar",27:"UL 2nd Molar",28:"UL 3rd Molar",
+  31:"LL Central Incisor",32:"LL Lateral Incisor",33:"LL Canine",
+  34:"LL 1st Premolar",35:"LL 2nd Premolar",36:"LL 1st Molar",37:"LL 2nd Molar",38:"LL 3rd Molar",
+  41:"LR Central Incisor",42:"LR Lateral Incisor",43:"LR Canine",
+  44:"LR 1st Premolar",45:"LR 2nd Premolar",46:"LR 1st Molar",47:"LR 2nd Molar",48:"LR 3rd Molar",
+};
+
+function nav(page) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  const items = document.querySelectorAll('.nav-item');
+  items.forEach(el => { if (el.getAttribute('onclick') && el.getAttribute('onclick').includes("'" + page + "'")) el.classList.add('active'); });
+  if (page === 'map') renderToothMap();
+}
+
+function severity_class(s) {
+  if (s === 'severe') return 'badge-severe';
+  if (s === 'moderate') return 'badge-moderate';
+  return 'badge-mild';
+}
+function type_class(t) { return 'badge-' + (t || 'other'); }
+function confColor(c) { return c > 0.6 ? '#E24B4A' : c > 0.35 ? '#BA7517' : '#185FA5'; }
+
+function renderAll() {
+  const data = allRecords;
+  const total = data.length;
+  const byType = {};
+  const bySev = {};
+  const byPG = {};
+  const byW = {};
+
+  data.forEach(r => {
+    byType[r.tooth_type] = (byType[r.tooth_type] || 0) + 1;
+    bySev[r.impaction_severity] = (bySev[r.impaction_severity] || 0) + 1;
+    if (r.pg_class) byPG[r.pg_class] = (byPG[r.pg_class] || 0) + 1;
+    if (r.winters_angle) byW[r.winters_angle] = (byW[r.winters_angle] || 0) + 1;
+  });
+
+  // Metrics
+  const patientSet = new Set(data.map(r => r.patient_id));
+  document.getElementById('m-patients').textContent = patientSet.size || '—';
+  document.getElementById('m-impacted').textContent = total || '—';
+  document.getElementById('m-severe').textContent = (bySev['severe'] || 0) + (bySev['moderate'] || 0);
+  const mc = Object.entries(byType).sort((a,b) => b[1]-a[1])[0];
+  document.getElementById('m-common').textContent = mc ? mc[0].charAt(0).toUpperCase() + mc[0].slice(1) : '—';
+
+  // Nav counts
+  document.getElementById('nc-dash').textContent = patientSet.size;
+  document.getElementById('nc-all').textContent = total;
+  document.getElementById('nc-wis').textContent = byType['wisdom'] || 0;
+  document.getElementById('nc-can').textContent = byType['canine'] || 0;
+  document.getElementById('nc-pre').textContent = byType['premolar'] || 0;
+
+  // Charts
+  buildChart('chartType', 'bar', Object.keys(byType), Object.values(byType),
+    ['#185FA5','#534AB7','#0F6E56','#888780'], 'Tooth count');
+  buildChart('chartSev', 'doughnut',
+    ['Mild','Moderate','Severe'],
+    [bySev['mild']||0, bySev['moderate']||0, bySev['severe']||0],
+    ['#185FA5','#BA7517','#E24B4A'], null);
+  buildChart('chartPG', 'bar', Object.keys(byPG), Object.values(byPG),
+    ['#534AB7','#AFA9EC','#EEEDFE'], 'Count');
+  buildChart('chartW', 'bar', Object.keys(byW), Object.values(byW),
+    ['#BA7517','#E24B4A','#185FA5','#0F6E56','#534AB7','#888780'], 'Count');
+
+  renderTable();
+  renderSubTable('wisdomTbody', data.filter(r => r.tooth_type === 'wisdom'), 'wisdom');
+  renderSubTable('canineTbody', data.filter(r => r.tooth_type === 'canine'), 'canine');
+  renderSubTable('premolarTbody', data.filter(r => r.tooth_type === 'premolar'), 'premolar');
+  renderToothMap();
+}
+
+function buildChart(id, type, labels, values, colors, label) {
+  if (charts[id]) { charts[id].destroy(); }
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  const cfg = {
+    type,
+    data: {
+      labels,
+      datasets: [{
+        label: label || '',
+        data: values,
+        backgroundColor: colors,
+        borderWidth: 0,
+        borderRadius: type === 'bar' ? 4 : 0,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: type === 'doughnut', position: 'right',
+        labels: { font: { size: 11 }, boxWidth: 10 } } },
+      scales: type !== 'doughnut' ? {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 }, precision: 0 } }
+      } : {}
+    }
+  };
+  charts[id] = new Chart(ctx, cfg);
+}
+
+function renderTable() {
+  const fType = document.getElementById('fType').value;
+  const fSev  = document.getElementById('fSev').value;
+  const fPG   = document.getElementById('fPG').value;
+  const fS    = document.getElementById('fSearch').value.toLowerCase();
+  let rows = allRecords.filter(r =>
+    (!fType || r.tooth_type === fType) &&
+    (!fSev  || r.impaction_severity === fSev) &&
+    (!fPG   || r.pg_class === fPG) &&
+    (!fS    || (r.patient_id + r.patient_name + r.tooth_name).toLowerCase().includes(fS))
+  );
+  const tbody = document.getElementById('recordsTbody');
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td><strong>${r.patient_name || r.patient_id}</strong><br><span style="font-size:11px;color:var(--text3)">${r.patient_id}</span></td>
+      <td style="color:var(--text3);font-size:12px">${r.study_date || '—'}</td>
+      <td>${r.tooth_name} <span style="color:var(--text3);font-size:11px">(${r.tooth_fdi})</span></td>
+      <td><span class="badge ${type_class(r.tooth_type)}">${r.tooth_type}</span></td>
+      <td>${r.pg_class ? '<span class="badge badge-pg">'+r.pg_class+'</span>' : '<span style="color:var(--text3)">—</span>'}</td>
+      <td>${r.pg_depth ? '<span class="badge badge-pg">'+r.pg_depth+'</span>' : '<span style="color:var(--text3)">—</span>'}</td>
+      <td>${r.winters_angle ? '<span class="badge badge-winters">'+r.winters_angle+'</span>' : '—'}</td>
+      <td><span class="badge ${severity_class(r.impaction_severity)}">${r.impaction_severity}</span></td>
+      <td>
+        <div class="conf-bar"><div class="conf-fill" style="width:${Math.round(r.confidence*100)}%;background:${confColor(r.confidence)}"></div></div>
+        <span style="font-size:11px;color:var(--text3);margin-left:5px">${Math.round(r.confidence*100)}%</span>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:2rem">No records match filters</td></tr>';
+}
+
+function renderSubTable(tbodyId, rows, type) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  if (type === 'wisdom') {
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td><strong>${r.patient_name || r.patient_id}</strong> <span style="font-size:11px;color:var(--text3)">${r.patient_id}</span></td>
+        <td>${r.tooth_name} (${r.tooth_fdi})</td>
+        <td>${r.pg_class ? '<span class="badge badge-pg">Class '+r.pg_class+'</span>' : '—'}</td>
+        <td>${r.pg_depth ? '<span class="badge badge-pg">Depth '+r.pg_depth+'</span>' : '—'}</td>
+        <td>${r.winters_angle ? '<span class="badge badge-winters">'+r.winters_angle+'</span>' : '—'}</td>
+        <td><span class="badge ${severity_class(r.impaction_severity)}">${r.impaction_severity}</span></td>
+        <td><span style="font-size:12px">${Math.round(r.confidence*100)}%</span></td>
+      </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:2rem">No wisdom tooth impactions found</td></tr>';
+  } else {
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td><strong>${r.patient_name || r.patient_id}</strong></td>
+        <td>${r.tooth_name} (${r.tooth_fdi})</td>
+        <td>${r.winters_angle ? '<span class="badge badge-winters">'+r.winters_angle+'</span>' : '—'}</td>
+        <td><span class="badge ${severity_class(r.impaction_severity)}">${r.impaction_severity}</span></td>
+        <td>${Math.round(r.confidence*100)}%</td>
+      </tr>`).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:2rem">No ${type} impactions found</td></tr>`;
+  }
+}
+
+function renderToothMap() {
+  const impactedFDI = {};
+  allRecords.forEach(r => { impactedFDI[r.tooth_fdi] = r.impaction_severity; });
+
+  const upper = [[18,17,16,15,14,13,12,11], [21,22,23,24,25,26,27,28]];
+  const lower = [[48,47,46,45,44,43,42,41], [31,32,33,34,35,36,37,38]];
+
+  function makeArch(rows) {
+    return rows.map(row => {
+      const cells = row.map(fdi => {
+        const sev = impactedFDI[fdi];
+        const cls = sev === 'severe' ? 'impacted' : sev === 'moderate' ? 'impacted-moderate' : sev === 'mild' ? 'impacted-mild' : '';
+        const title = FDI_NAMES[fdi] || fdi;
+        return `<div class="tooth-box ${cls}" title="${title}\n${sev ? 'Severity: '+sev : 'No impaction detected'}">${fdi}</div>`;
+      }).join('');
+      return `<div class="arch-row">${cells}</div>`;
+    }).join('');
+  }
+
+  document.getElementById('toothMap').innerHTML = `
+    <div class="arch-label">Upper arch</div>
+    <div style="display:flex;gap:16px">${makeArch([upper[0]])}${makeArch([upper[1]])}</div>
+    <div class="arch-spacer"></div>
+    <div style="display:flex;gap:16px">${makeArch([lower[0]])}${makeArch([lower[1]])}</div>
+    <div class="arch-label">Lower arch</div>
+    <div class="tooth-legend">
+      <span><div class="leg-dot" style="background:var(--danger-light);border:1.5px solid var(--danger)"></div> Severe</span>
+      <span><div class="leg-dot" style="background:var(--warn-light);border:1.5px solid var(--warn)"></div> Moderate</span>
+      <span><div class="leg-dot" style="background:var(--accent-light);border:1.5px solid var(--accent)"></div> Mild</span>
+      <span><div class="leg-dot" style="background:var(--surface2);border:1.5px solid var(--border2)"></div> Normal</span>
+    </div>
+  `;
+}
+
+function loadJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      allRecords = Array.isArray(data) ? data : [];
+      log('info', `Loaded ${allRecords.length} records from ${file.name}`);
+      renderAll();
+      nav('dashboard');
+    } catch(err) {
+      log('err', 'Failed to parse JSON: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function log(type, msg) {
+  const box = document.getElementById('logBox');
+  box.style.display = 'block';
+  const span = document.createElement('span');
+  span.className = 'log-line log-' + type;
+  span.textContent = new Date().toLocaleTimeString() + '  ' + msg;
+  box.appendChild(span);
+  box.scrollTop = box.scrollHeight;
+}
+
+function loadDemo() {
+  const now = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  allRecords = [
+    {patient_id:'PT001',patient_name:'Asante Kofi',study_date:now,tooth_fdi:18,tooth_name:'UR 3rd Molar',tooth_type:'wisdom',pg_class:'II',pg_depth:'B',winters_angle:'mesioangular',impaction_severity:'moderate',confidence:0.61},
+    {patient_id:'PT001',patient_name:'Asante Kofi',study_date:now,tooth_fdi:38,tooth_name:'LL 3rd Molar',tooth_type:'wisdom',pg_class:'III',pg_depth:'C',winters_angle:'horizontal',impaction_severity:'severe',confidence:0.78},
+    {patient_id:'PT002',patient_name:'Mensah Abena',study_date:now,tooth_fdi:23,tooth_name:'UL Canine',tooth_type:'canine',pg_class:null,pg_depth:null,winters_angle:'vertical',impaction_severity:'mild',confidence:0.35},
+    {patient_id:'PT002',patient_name:'Mensah Abena',study_date:now,tooth_fdi:43,tooth_name:'LR Canine',tooth_type:'canine',pg_class:null,pg_depth:null,winters_angle:'transverse',impaction_severity:'moderate',confidence:0.52},
+    {patient_id:'PT003',patient_name:'Boateng Kwame',study_date:now,tooth_fdi:28,tooth_name:'UL 3rd Molar',tooth_type:'wisdom',pg_class:'I',pg_depth:'A',winters_angle:'distoangular',impaction_severity:'mild',confidence:0.29},
+    {patient_id:'PT003',patient_name:'Boateng Kwame',study_date:now,tooth_fdi:48,tooth_name:'LR 3rd Molar',tooth_type:'wisdom',pg_class:'II',pg_depth:'B',winters_angle:'mesioangular',impaction_severity:'moderate',confidence:0.58},
+    {patient_id:'PT003',patient_name:'Boateng Kwame',study_date:now,tooth_fdi:13,tooth_name:'UR Canine',tooth_type:'canine',pg_class:null,pg_depth:null,winters_angle:'vertical',impaction_severity:'mild',confidence:0.33},
+    {patient_id:'PT004',patient_name:'Adjei Ama',study_date:now,tooth_fdi:14,tooth_name:'UR 1st Premolar',tooth_type:'premolar',pg_class:null,pg_depth:null,winters_angle:'vertical',impaction_severity:'mild',confidence:0.27},
+    {patient_id:'PT005',patient_name:'Owusu Yaw',study_date:now,tooth_fdi:18,tooth_name:'UR 3rd Molar',tooth_type:'wisdom',pg_class:'III',pg_depth:'C',winters_angle:'horizontal',impaction_severity:'severe',confidence:0.82},
+    {patient_id:'PT005',patient_name:'Owusu Yaw',study_date:now,tooth_fdi:28,tooth_name:'UL 3rd Molar',tooth_type:'wisdom',pg_class:'III',pg_depth:'B',winters_angle:'distoangular',impaction_severity:'severe',confidence:0.75},
+    {patient_id:'PT005',patient_name:'Owusu Yaw',study_date:now,tooth_fdi:38,tooth_name:'LL 3rd Molar',tooth_type:'wisdom',pg_class:'II',pg_depth:'C',winters_angle:'mesioangular',impaction_severity:'moderate',confidence:0.60},
+    {patient_id:'PT005',patient_name:'Owusu Yaw',study_date:now,tooth_fdi:48,tooth_name:'LR 3rd Molar',tooth_type:'wisdom',pg_class:'II',pg_depth:'C',winters_angle:'mesioangular',impaction_severity:'moderate',confidence:0.57},
+  ];
+  renderAll();
+  nav('dashboard');
+}
+
+function exportCSV() {
+  const headers = ['patient_id','patient_name','study_date','tooth_fdi','tooth_name','tooth_type','pg_class','pg_depth','winters_angle','impaction_severity','confidence'];
+  const rows = allRecords.map(r => headers.map(h => JSON.stringify(r[h] ?? '')).join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'dental_impactions.csv';
+  a.click();
+}
+
+// Auto-load demo on first open
+loadDemo();
+</script>
+</body>
+</html>
